@@ -8,8 +8,11 @@ from stravalib.client import Client
 
 from fitnessllm_shared.cloud_utils import get_secret
 from fitnessllm_shared.logger_utils import create_structured_logger
-from fitnessllm_shared.task_utils import encrypt_token
-from fitnessllm_shared.task_utils import decrypt_token, update_last_refresh
+from fitnessllm_shared.task_utils import (
+    decrypt_token,
+    encrypt_token,
+    update_last_refresh,
+)
 
 structured_logger = create_structured_logger(__name__)
 
