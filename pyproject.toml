@@ -1,0 +1,20 @@
+[project]
+name = "fitnessllm-shared"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Santosh Gummidipundi",email = "santosh@santoshg.io"}
+]
+readme = "README.md"
+requires-python = "3.12.2"
+dependencies = [
+    "beartype (>=0.20.2,<0.21.0)",
+    "stravalib (>=2.3,<3.0)",
+    "firebase-admin (>=6.8.0,<7.0.0)",
+    "google-cloud-secret-manager (>=2.23.3,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
