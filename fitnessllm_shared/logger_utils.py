@@ -97,7 +97,7 @@ class StructuredLogger:
 
 
 def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
-    """Sets up a logger with a console handler.
+    """Sets up a logger with a console handler and Google Cloud Logging handler.
 
     Args:
         name (str): Name of the logger.
@@ -106,30 +106,27 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
     Returns:
         logging.Logger: Configured logger instance.
     """
-    # Create a custom logger
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("stravalib").setLevel(logging.WARNING)
     logging.getLogger("google.auth._default").setLevel(logging.WARNING)
 
-    # Prevent adding duplicate handlers if this function is called multiple times
-    if logger.hasHandlers():
-        return logger
+    # Add console handler if not present
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-    console_handler.setFormatter(formatter)
-
-    logger.addHandler(console_handler)
-
-    client = google.cloud.logging.Client()
-    cloud_handler = CloudLoggingHandler(client)
-    logger.addHandler(cloud_handler)
+    # Add CloudLoggingHandler if not present
+    if not any(isinstance(h, CloudLoggingHandler) for h in logger.handlers):
+        client = google.cloud.logging.Client()
+        cloud_handler = CloudLoggingHandler(client)
+        logger.addHandler(cloud_handler)
 
     return logger
 
