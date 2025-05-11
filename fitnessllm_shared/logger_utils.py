@@ -2,14 +2,23 @@
 
 import logging
 import os
+import subprocess
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import logging as cloud_logging
 from google.cloud.logging.handlers import CloudLoggingHandler
 
+from fitnessllm_shared.entities.constants import TIMEZONE
+
 
 def is_running_in_gcp():
-    """Check if the code is running in Google Cloud Platform (GCP)."""
+    """Check if the code is running in Google Cloud Platform (GCP).
+
+    Returns:
+        bool: True if running in GCP, False otherwise.
+    """
     return bool(os.getenv("CLOUD_RUN_JOB"))
 
 
@@ -17,10 +26,15 @@ class StructuredLogger:
     """Custom logger that adds structured logging capabilities."""
 
     def __init__(self):
-        """Initialize the structured logger."""
+        """Initialize the structured logger.
+
+        Sets up the logger, attaches appropriate handlers for GCP or local environments,
+        and determines the current git commit hash and authentication status.
+        """
         self.logger = logging.getLogger("fitnessllm")
         self.logger.setLevel(logging.INFO)
         self.logger.propagate = False  # Prevent double logging
+        self.commit_hash = get_git_commit_hash_for_fitnessllm_shared()
 
         # Remove all existing handlers to avoid duplicates
         for handler in list(self.logger.handlers):
@@ -42,50 +56,84 @@ class StructuredLogger:
         else:
             self.logger.addHandler(logging.StreamHandler())
 
+    def _format_log(self, level, message, **kwargs):
+        """Format the log entry as a structured dictionary.
+
+        Args:
+            level (str): The log level (e.g., 'INFO', 'ERROR').
+            message (str): The log message.
+            **kwargs: Additional context to include in the log entry.
+
+        Returns:
+            dict: Structured log entry including commit hash and authentication status.
+        """
+        log_data = {
+            "level": level,
+            "message": message,
+            "timestamp": datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
+            "commit_hash": self.commit_hash,
+            "gcp_authenticated": self.gcp_authenticated,
+        }
+        log_data.update(kwargs)
+        return log_data
+
     def info(self, message, **kwargs):
-        """Logs an informational message.
+        """Log an informational message with structured data.
 
         Args:
             message (str): The message to log.
             **kwargs: Additional context to include in the log entry.
         """
-        self.logger.info(message, extra=kwargs)
+        self.logger.info(self._format_log("INFO", message, **kwargs))
 
     def warning(self, message, **kwargs):
-        """Logs a warning message.
+        """Log a warning message with structured data.
 
         Args:
             message (str): The message to log.
             **kwargs: Additional context to include in the log entry.
         """
-        self.logger.warning(message, extra=kwargs)
+        self.logger.warning(self._format_log("WARNING", message, **kwargs))
 
     def error(self, message, **kwargs):
-        """Logs an error message.
+        """Log an error message with structured data.
 
         Args:
             message (str): The message to log.
             **kwargs: Additional context to include in the log entry.
         """
-        self.logger.error(message, extra=kwargs)
+        self.logger.error(self._format_log("ERROR", message, **kwargs))
 
     def debug(self, message, **kwargs):
-        """Logs a debug message.
+        """Log a debug message with structured data.
 
         Args:
             message (str): The message to log.
             **kwargs: Additional context to include in the log entry.
         """
-        self.logger.debug(message, extra=kwargs)
+        self.logger.debug(self._format_log("DEBUG", message, **kwargs))
 
     def critical(self, message, **kwargs):
-        """Logs a critical message.
+        """Log a critical message with structured data.
 
         Args:
             message (str): The message to log.
             **kwargs: Additional context to include in the log entry.
         """
-        self.logger.critical(message, extra=kwargs)
+        self.logger.critical(self._format_log("CRITICAL", message, **kwargs))
+
+
+def get_git_commit_hash_for_fitnessllm_shared() -> str:
+    """Get git commit hash for fitnessllm_shared."""
+    try:
+        repo_dir = os.path.dirname(os.path.abspath(__file__))
+        return (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_dir)
+            .decode("ascii")
+            .strip()
+        )
+    except Exception:
+        return "unknown"
 
 
 # Export a singleton instance
