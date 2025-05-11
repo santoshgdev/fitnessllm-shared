@@ -1,11 +1,13 @@
 """Logging utilities."""
 
-import json
 import logging
 from datetime import datetime
 from logging import Logger
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
+
+import google.cloud.logging
+from google.cloud.logging.handlers import CloudLoggingHandler
 
 from fitnessllm_shared.entities.constants import TIMEZONE
 
@@ -58,7 +60,7 @@ class StructuredLogger:
     ) -> None:
         """Log info level message with structured data."""
         log_data = self._format_log("INFO", message, data_source, user_id, **kwargs)
-        self.logger.info(json.dumps(log_data))
+        self.logger.info(log_data)
 
     def error(
         self,
@@ -69,7 +71,7 @@ class StructuredLogger:
     ) -> None:
         """Log error level message with structured data."""
         log_data = self._format_log("ERROR", message, data_source, user_id, **kwargs)
-        self.logger.error(json.dumps(log_data))
+        self.logger.error(log_data)
 
     def warning(
         self,
@@ -80,7 +82,7 @@ class StructuredLogger:
     ) -> None:
         """Log warning level message with structured data."""
         log_data = self._format_log("WARNING", message, data_source, user_id, **kwargs)
-        self.logger.warning(json.dumps(log_data))
+        self.logger.warning(log_data)
 
     def debug(
         self,
@@ -91,7 +93,7 @@ class StructuredLogger:
     ) -> None:
         """Log debug level message with structured data."""
         log_data = self._format_log("DEBUG", message, data_source, user_id, **kwargs)
-        self.logger.debug(json.dumps(log_data))
+        self.logger.debug(log_data)
 
 
 def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
@@ -124,6 +126,10 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
     console_handler.setFormatter(formatter)
 
     logger.addHandler(console_handler)
+
+    client = google.cloud.logging.Client()
+    cloud_handler = CloudLoggingHandler(client)
+    logger.addHandler(cloud_handler)
 
     return logger
 
