@@ -23,7 +23,7 @@ class StructuredLogger:
             name: Name of the logger
             level: Logging level
         """
-        self.logger = setup_logger(name, level)
+        self.logger, self.gcp_authenticated = setup_logger(name, level)
         self.name = name or "root"
 
     def _format_log(
@@ -40,6 +40,7 @@ class StructuredLogger:
             "message": message,
             "service": self.name,
             "timestamp": datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
+            "gcp_authenticated": self.gcp_authenticated,
         }
 
         if data_source:
@@ -97,7 +98,7 @@ class StructuredLogger:
         self.logger.debug(log_data)
 
 
-def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
+def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> tuple[Logger, bool]:
     """Sets up a logger with a console handler and Google Cloud Logging handler.
 
     Args:
@@ -105,7 +106,7 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
         level (int): Logging level (e.g., logging.DEBUG, logging.INFO).
 
     Returns:
-        logging.Logger: Configured logger instance.
+        tuple[logging.Logger, bool]: Configured logger instance and authentication status.
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -123,20 +124,21 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 
-    # Try to add CloudLoggingHandler if not present
+    authenticated = False
     try:
         if not any(isinstance(h, CloudLoggingHandler) for h in logger.handlers):
             client = google.cloud.logging.Client()
             cloud_handler = CloudLoggingHandler(client)
             logger.addHandler(cloud_handler)
+            authenticated = True
     except DefaultCredentialsError:
         logger.warning("Google Cloud credentials not found. Falling back to console logging only.")
 
-    return logger
+    return logger, authenticated
 
 
 # Create default logger instance
-logger = setup_logger()
+logger, gcp_authenticated = setup_logger()
 
 # Create default structured logger instance
 structured_logger = StructuredLogger()
