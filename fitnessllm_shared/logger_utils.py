@@ -1,14 +1,15 @@
 """Logging utilities."""
 
 import logging
+import os
 from datetime import datetime
 from logging import Logger
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 import google.cloud.logging
-from google.cloud.logging.handlers import CloudLoggingHandler
 from google.auth.exceptions import DefaultCredentialsError
+from google.cloud.logging.handlers import CloudLoggingHandler
 
 from fitnessllm_shared.entities.constants import TIMEZONE
 
@@ -98,7 +99,9 @@ class StructuredLogger:
         self.logger.debug(log_data)
 
 
-def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> tuple[Logger, bool]:
+def setup_logger(
+    name: str | None = None, level: int = logging.DEBUG
+) -> tuple[Logger, bool]:
     """Sets up a logger with a console handler and Google Cloud Logging handler.
 
     Args:
@@ -109,6 +112,7 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> tuple[L
         tuple[logging.Logger, bool]: Configured logger instance and authentication status.
     """
     logger = logging.getLogger(name)
+    logger.debug("Initializing logger")
     logger.setLevel(level)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("stravalib").setLevel(logging.WARNING)
@@ -132,8 +136,18 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> tuple[L
             logger.addHandler(cloud_handler)
             authenticated = True
     except DefaultCredentialsError:
-        logger.warning("Google Cloud credentials not found. Falling back to console logging only.")
-
+        logger.warning(
+            "Google Cloud credentials not found. Falling back to console logging only."
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error initializing CloudLoggingHandler: {e}")
+    finally:
+        # Debug info for troubleshooting
+        logger.info(f"GOOGLE_CLOUD_PROJECT: {os.getenv('GOOGLE_CLOUD_PROJECT')}")
+        logger.info(
+            f"GOOGLE_APPLICATION_CREDENTIALS: {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}"
+        )
+        logger.info(f"GCP Authenticated: {authenticated}")
     return logger, authenticated
 
 
