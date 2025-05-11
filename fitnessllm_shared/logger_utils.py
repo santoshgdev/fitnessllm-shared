@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 import google.cloud.logging
 from google.cloud.logging.handlers import CloudLoggingHandler
+from google.auth.exceptions import DefaultCredentialsError
 
 from fitnessllm_shared.entities.constants import TIMEZONE
 
@@ -122,11 +123,14 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG) -> Logger:
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 
-    # Add CloudLoggingHandler if not present
-    if not any(isinstance(h, CloudLoggingHandler) for h in logger.handlers):
-        client = google.cloud.logging.Client()
-        cloud_handler = CloudLoggingHandler(client)
-        logger.addHandler(cloud_handler)
+    # Try to add CloudLoggingHandler if not present
+    try:
+        if not any(isinstance(h, CloudLoggingHandler) for h in logger.handlers):
+            client = google.cloud.logging.Client()
+            cloud_handler = CloudLoggingHandler(client)
+            logger.addHandler(cloud_handler)
+    except DefaultCredentialsError:
+        logger.warning("Google Cloud credentials not found. Falling back to console logging only.")
 
     return logger
 
