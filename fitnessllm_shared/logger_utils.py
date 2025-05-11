@@ -1,170 +1,92 @@
-"""Logging utilities."""
+"""Logging utilities for structured logging in Python."""
 
 import logging
 import os
-from datetime import datetime
-from logging import Logger
-from typing import Any, Optional
-from zoneinfo import ZoneInfo
 
-import google.cloud.logging
 from google.auth.exceptions import DefaultCredentialsError
+from google.cloud import logging as cloud_logging
 from google.cloud.logging.handlers import CloudLoggingHandler
 
-from fitnessllm_shared.entities.constants import TIMEZONE
+
+def is_running_in_gcp():
+    """Check if the code is running in Google Cloud Platform (GCP)."""
+    return os.getenv("K_SERVICE") or os.getenv("GOOGLE_CLOUD_PROJECT")
 
 
 class StructuredLogger:
     """Custom logger that adds structured logging capabilities."""
 
-    def __init__(self, name: str | None = None, level: int = logging.DEBUG) -> None:
-        """Initialize the structured logger.
-
-        Args:
-            name: Name of the logger
-            level: Logging level
-        """
+    def __init__(self):
+        """Initialize the structured logger."""
         self.logger = logging.getLogger("fitnessllm")
+        self.logger.setLevel(logging.INFO)
+        self.logger.propagate = False  # Prevent double logging
+
+        # Remove all existing handlers to avoid duplicates
+        for handler in list(self.logger.handlers):
+            self.logger.removeHandler(handler)
+
         self.gcp_authenticated = False
-        try:
-            if not any(
-                isinstance(h, CloudLoggingHandler) for h in self.logger.handlers
-            ):
-                client = google.cloud.logging.Client()
+
+        if is_running_in_gcp():
+            try:
+                client = cloud_logging.Client()
                 cloud_handler = CloudLoggingHandler(client)
                 self.logger.addHandler(cloud_handler)
                 self.gcp_authenticated = True
-        except DefaultCredentialsError:
-            self.logger.warning(
-                "Google Cloud credentials not found. Falling back to console logging only."
-            )
+            except DefaultCredentialsError:
+                self.logger.warning(
+                    "Google Cloud credentials not found. Falling back to console logging only."
+                )
+                self.logger.addHandler(logging.StreamHandler())
+        else:
+            self.logger.addHandler(logging.StreamHandler())
 
-    def _format_log(
-        self,
-        level: str,
-        message: str,
-        data_source: Optional[str] = None,
-        user_id: Optional[str] = None,
-        **kwargs,
-    ) -> dict[str, Any]:
-        """Format log entry with structured data."""
-        log_data = {
-            "level": level,
-            "message": message,
-            "service": "fitnessllm",
-            "timestamp": datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
-            "gcp_authenticated": self.gcp_authenticated,
-        }
+    def info(self, message, **kwargs):
+        """Logs an informational message.
 
-        if data_source:
-            log_data["data_source"] = data_source
-        if user_id:
-            log_data["user_id"] = user_id
+        Args:
+            message (str): The message to log.
+            **kwargs: Additional context to include in the log entry.
+        """
+        self.logger.info(message, extra=kwargs)
 
-        # Add any additional fields
-        log_data.update(kwargs)
+    def warning(self, message, **kwargs):
+        """Logs a warning message.
 
-        return log_data
+        Args:
+            message (str): The message to log.
+            **kwargs: Additional context to include in the log entry.
+        """
+        self.logger.warning(message, extra=kwargs)
 
-    def info(
-        self,
-        message: str,
-        data_source: Optional[str] = None,
-        user_id: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log info level message with structured data."""
-        log_data = self._format_log("INFO", message, data_source, user_id, **kwargs)
-        self.logger.info(log_data)
+    def error(self, message, **kwargs):
+        """Logs an error message.
 
-    def error(
-        self,
-        message: str,
-        data_source: Optional[str] = None,
-        user_id: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log error level message with structured data."""
-        log_data = self._format_log("ERROR", message, data_source, user_id, **kwargs)
-        self.logger.error(log_data)
+        Args:
+            message (str): The message to log.
+            **kwargs: Additional context to include in the log entry.
+        """
+        self.logger.error(message, extra=kwargs)
 
-    def warning(
-        self,
-        message: str,
-        data_source: Optional[str] = None,
-        user_id: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log warning level message with structured data."""
-        log_data = self._format_log("WARNING", message, data_source, user_id, **kwargs)
-        self.logger.warning(log_data)
+    def debug(self, message, **kwargs):
+        """Logs a debug message.
 
-    def debug(
-        self,
-        message: str,
-        data_source: Optional[str] = None,
-        user_id: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log debug level message with structured data."""
-        log_data = self._format_log("DEBUG", message, data_source, user_id, **kwargs)
-        self.logger.debug(log_data)
+        Args:
+            message (str): The message to log.
+            **kwargs: Additional context to include in the log entry.
+        """
+        self.logger.debug(message, extra=kwargs)
+
+    def critical(self, message, **kwargs):
+        """Logs a critical message.
+
+        Args:
+            message (str): The message to log.
+            **kwargs: Additional context to include in the log entry.
+        """
+        self.logger.critical(message, extra=kwargs)
 
 
-def setup_logger(
-    name: str | None = None, level: int = logging.DEBUG
-) -> tuple[Logger, bool]:
-    """Sets up a logger with a console handler and Google Cloud Logging handler.
-
-    Args:
-        name (str): Name of the logger.
-        level (int): Logging level (e.g., logging.DEBUG, logging.INFO).
-
-    Returns:
-        tuple[logging.Logger, bool]: Configured logger instance and authentication status.
-    """
-    logger = logging.getLogger(name)
-    logger.debug("Initializing logger")
-    logger.setLevel(level)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("stravalib").setLevel(logging.WARNING)
-    logging.getLogger("google.auth._default").setLevel(logging.WARNING)
-
-    # Add console handler if not present
-    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-
-    authenticated = False
-    try:
-        if not any(isinstance(h, CloudLoggingHandler) for h in logger.handlers):
-            client = google.cloud.logging.Client()
-            cloud_handler = CloudLoggingHandler(client)
-            logger.addHandler(cloud_handler)
-            authenticated = True
-    except DefaultCredentialsError:
-        logger.warning(
-            "Google Cloud credentials not found. Falling back to console logging only."
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error initializing CloudLoggingHandler: {e}")
-    finally:
-        # Debug info for troubleshooting
-        logger.info(f"GOOGLE_CLOUD_PROJECT: {os.getenv('GOOGLE_CLOUD_PROJECT')}")
-        logger.info(
-            f"GOOGLE_APPLICATION_CREDENTIALS: {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}"
-        )
-        logger.info(f"GCP Authenticated: {authenticated}")
-    return logger, authenticated
-
-
-# Create default logger instance
-logger, gcp_authenticated = setup_logger()
-
-# Create default structured logger instance
+# Export a singleton instance
 structured_logger = StructuredLogger()
