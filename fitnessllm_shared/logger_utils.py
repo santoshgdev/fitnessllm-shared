@@ -24,8 +24,20 @@ class StructuredLogger:
             name: Name of the logger
             level: Logging level
         """
-        self.logger, self.gcp_authenticated = setup_logger(name, level)
-        self.name = name or "root"
+        self.logger = logging.getLogger("fitnessllm")
+        self.gcp_authenticated = False
+        try:
+            if not any(
+                isinstance(h, CloudLoggingHandler) for h in self.logger.handlers
+            ):
+                client = google.cloud.logging.Client()
+                cloud_handler = CloudLoggingHandler(client)
+                self.logger.addHandler(cloud_handler)
+                self.gcp_authenticated = True
+        except DefaultCredentialsError:
+            self.logger.warning(
+                "Google Cloud credentials not found. Falling back to console logging only."
+            )
 
     def _format_log(
         self,
@@ -39,7 +51,7 @@ class StructuredLogger:
         log_data = {
             "level": level,
             "message": message,
-            "service": self.name,
+            "service": "fitnessllm",
             "timestamp": datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
             "gcp_authenticated": self.gcp_authenticated,
         }
