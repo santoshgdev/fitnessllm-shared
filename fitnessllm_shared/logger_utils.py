@@ -10,7 +10,7 @@ from google.cloud.logging.handlers import CloudLoggingHandler
 
 def is_running_in_gcp():
     """Check if the code is running in Google Cloud Platform (GCP)."""
-    return os.getenv("K_SERVICE") or os.getenv("GOOGLE_CLOUD_PROJECT")
+    return bool(os.getenv("CLOUD_RUN_JOB"))
 
 
 class StructuredLogger:
