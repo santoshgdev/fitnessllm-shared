@@ -2,10 +2,10 @@
 
 import logging
 import os
-import subprocess
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import requests
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import logging as cloud_logging
 from google.cloud.logging.handlers import CloudLoggingHandler
@@ -34,7 +34,9 @@ class StructuredLogger:
         self.logger = logging.getLogger("fitnessllm")
         self.logger.setLevel(logging.INFO)
         self.logger.propagate = False  # Prevent double logging
-        self.commit_hash = get_git_commit_hash_for_fitnessllm_shared()
+        self.commit_hash = get_github_head_commit(
+            owner="santoshgdev", repo="fitnessllm-shared"
+        )
 
         # Remove all existing handlers to avoid duplicates
         for handler in list(self.logger.handlers):
@@ -123,18 +125,19 @@ class StructuredLogger:
         self.logger.critical(self._format_log("CRITICAL", message, **kwargs))
 
 
-def get_git_commit_hash_for_fitnessllm_shared() -> str:
-    """Get git commit hash for fitnessllm_shared."""
-    try:
-        repo_dir = os.path.dirname(os.path.abspath(__file__))
-        return (
-            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_dir)
-            .decode("ascii")
-            .strip()
-        )
-    except Exception:
-        return "unknown"
+def get_github_head_commit(owner, repo, branch="main"):
+    """Get the head commit hash for a given GitHub repository and branch.
+
+    Args:
+        owner (str): The owner of the repository.
+        repo (str): The name of the repository.
+        branch (str): The branch to get the head commit hash for.
+    """
+    url = f"https://api.github.com/repos/{owner}/{repo}/commits/{branch}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()["sha"]
+    return "unknown"
 
 
-# Export a singleton instance
 structured_logger = StructuredLogger()
