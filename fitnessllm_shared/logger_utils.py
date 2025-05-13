@@ -33,7 +33,7 @@ class StructuredLogger:
         self.logger = logging.getLogger("fitnessllm")
         self.logger.setLevel(logging.INFO)
         self.logger.propagate = False  # Prevent double logging
-        self.shared_commit_hash = os.getenv("FITNESSLLM_SHARED_COMMIT_HASH")
+        self.shared_commit_hash = get_shared_commit_hash()
 
         # Remove all existing handlers to avoid duplicates
         for handler in list(self.logger.handlers):
@@ -120,6 +120,19 @@ class StructuredLogger:
             **kwargs: Additional context to include in the log entry.
         """
         self.logger.critical(self._format_log("CRITICAL", message, **kwargs))
+
+
+def get_shared_commit_hash() -> str:
+    """Get the commit hash of the fitnessllm-shared package.
+
+    Returns:
+        str: The first 5 characters of the commit hash, or empty string if not found.
+    """
+    try:
+        with open("/app/commit_hash.txt") as f:
+            return f.read().strip()
+    except (FileNotFoundError, OSError):
+        return ""
 
 
 structured_logger = StructuredLogger()
