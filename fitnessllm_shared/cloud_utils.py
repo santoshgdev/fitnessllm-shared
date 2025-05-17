@@ -20,6 +20,7 @@ def get_secret(name: str) -> dict:
         response = client.access_secret_version(
             request={
                 "name": f"projects/{environ['PROJECT_ID']}/secrets/{name}/versions/latest",
+            }
         )
         structured_logger.info(message=f"Retrieved secret {name}", service="shared")
         secret_payload = response.payload.data.decode("UTF-8")
