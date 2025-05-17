@@ -9,7 +9,7 @@ from fitnessllm_shared.logger_utils import structured_logger
 
 
 @beartype
-def get_secret(name: str) -> dict:
+def get_secret(name: str) -> dict | str:
     """Retrieve secret from secret manager."""
     if "PROJECT_ID" not in environ:
         raise KeyError("PROJECT_ID environment variable not found")
